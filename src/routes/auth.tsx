@@ -119,6 +119,10 @@ function AuthPage() {
                   <Input required value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Como devemos te chamar" />
                 </div>
                 <div className="space-y-2">
+                  <Label>Nome de usuário (opcional)</Label>
+                  <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="ex: joao_silva" />
+                </div>
+                <div className="space-y-2">
                   <Label>Email</Label>
                   <Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
                 </div>
