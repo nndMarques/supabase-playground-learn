@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { BookOpen } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { logActivity } from "@/lib/activity";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "Entrar — Diário de Aprendizado" }] }),
@@ -33,6 +34,7 @@ function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [username, setUsername] = useState("");
   const [dob, setDob] = useState("");
   const [interest, setInterest] = useState(INTERESTS[0]);
   const [bio, setBio] = useState("");
@@ -45,10 +47,11 @@ function AuthPage() {
   const signIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
-    if (error) toast.error(error.message);
-    else navigate({ to: "/dashboard" });
+    if (error) return toast.error(error.message);
+    if (data.user) logActivity(data.user.id, "login", { method: "password" });
+    navigate({ to: "/dashboard" });
   };
 
   const signUp = async (e: React.FormEvent) => {
@@ -62,6 +65,7 @@ function AuthPage() {
         emailRedirectTo: `${window.location.origin}/dashboard`,
         data: {
           full_name: fullName.trim(),
+          username: username.trim(),
           date_of_birth: dob || null,
           interest_area: interest,
           bio: bio.trim(),
@@ -113,6 +117,10 @@ function AuthPage() {
                 <div className="space-y-2">
                   <Label>Nome completo</Label>
                   <Input required value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Como devemos te chamar" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Nome de usuário (opcional)</Label>
+                  <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="ex: joao_silva" />
                 </div>
                 <div className="space-y-2">
                   <Label>Email</Label>

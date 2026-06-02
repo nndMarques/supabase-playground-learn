@@ -2,20 +2,24 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { logActivity } from "@/lib/activity";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { BookOpen, LogOut, Plus, Trash2, Pencil, X, UserCircle2 } from "lucide-react";
+import { BookOpen, LogOut, Plus, Trash2, Pencil, X, UserCircle2, Activity } from "lucide-react";
 
 type Note = {
   id: string;
   title: string;
   content: string;
   category: string;
+  category_id: string | null;
   created_at: string;
 };
+
+type Category = { id: string; name: string; color: string };
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "Meu Diário" }] }),
@@ -26,23 +30,28 @@ function Dashboard() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const [notes, setNotes] = useState<Note[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Note | null>(null);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [category, setCategory] = useState("Geral");
+  const [categoryId, setCategoryId] = useState<string>("");
+  const [newCatName, setNewCatName] = useState("");
+  const [addingCat, setAddingCat] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) navigate({ to: "/auth" });
   }, [user, loading, navigate]);
 
   const load = async () => {
-    const { data, error } = await supabase
-      .from("learning_notes")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (error) toast.error(error.message);
-    else setNotes(data as Note[]);
+    const [notesRes, catsRes] = await Promise.all([
+      supabase.from("learning_notes").select("*").order("created_at", { ascending: false }),
+      supabase.from("categories").select("id, name, color").order("name"),
+    ]);
+    if (notesRes.error) toast.error(notesRes.error.message);
+    else setNotes(notesRes.data as Note[]);
+    if (catsRes.error) toast.error(catsRes.error.message);
+    else setCategories(catsRes.data as Category[]);
   };
 
   useEffect(() => {
@@ -53,26 +62,34 @@ function Dashboard() {
     setEditing(null);
     setTitle("");
     setContent("");
-    setCategory("Geral");
+    setCategoryId("");
     setOpen(false);
   };
+
+  const categoryNameFromId = (id: string) =>
+    categories.find((c) => c.id === id)?.name ?? "Geral";
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+    const catName = categoryId ? categoryNameFromId(categoryId) : "Geral";
     if (editing) {
       const { error } = await supabase
         .from("learning_notes")
-        .update({ title, content, category })
+        .update({ title, content, category: catName, category_id: categoryId || null })
         .eq("id", editing.id);
       if (error) return toast.error(error.message);
       toast.success("Anotação atualizada");
+      logActivity(user.id, "note_updated", { note_id: editing.id, title });
     } else {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("learning_notes")
-        .insert({ title, content, category, user_id: user.id });
+        .insert({ title, content, category: catName, category_id: categoryId || null, user_id: user.id })
+        .select("id")
+        .single();
       if (error) return toast.error(error.message);
       toast.success("Anotação criada");
+      if (data) logActivity(user.id, "note_created", { note_id: data.id, title });
     }
     reset();
     load();
@@ -82,6 +99,7 @@ function Dashboard() {
     const { error } = await supabase.from("learning_notes").delete().eq("id", id);
     if (error) return toast.error(error.message);
     toast.success("Anotação removida");
+    if (user) logActivity(user.id, "note_deleted", { note_id: id });
     load();
   };
 
@@ -89,11 +107,28 @@ function Dashboard() {
     setEditing(n);
     setTitle(n.title);
     setContent(n.content);
-    setCategory(n.category);
+    setCategoryId(n.category_id ?? "");
     setOpen(true);
   };
 
+  const addCategory = async () => {
+    if (!user || !newCatName.trim()) return;
+    const { data, error } = await supabase
+      .from("categories")
+      .insert({ user_id: user.id, name: newCatName.trim() })
+      .select("id, name, color")
+      .single();
+    if (error) return toast.error(error.message);
+    if (data) {
+      setCategories((c) => [...c, data as Category].sort((a, b) => a.name.localeCompare(b.name)));
+      setCategoryId(data.id);
+    }
+    setNewCatName("");
+    setAddingCat(false);
+  };
+
   const signOut = async () => {
+    if (user) await logActivity(user.id, "logout");
     await supabase.auth.signOut();
     navigate({ to: "/" });
   };
@@ -110,6 +145,9 @@ function Dashboard() {
           </div>
           <div className="flex items-center gap-2">
             <span className="hidden text-sm text-muted-foreground sm:inline">{user.email}</span>
+            <Button asChild variant="ghost" size="sm">
+              <Link to="/activity"><Activity className="mr-2 h-4 w-4" /> Atividade</Link>
+            </Button>
             <Button asChild variant="ghost" size="sm">
               <Link to="/profile"><UserCircle2 className="mr-2 h-4 w-4" /> Perfil</Link>
             </Button>
@@ -145,7 +183,34 @@ function Dashboard() {
                 </div>
                 <div className="space-y-2">
                   <Label>Categoria</Label>
-                  <Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Ex: React, Supabase..." />
+                  {addingCat ? (
+                    <div className="flex gap-2">
+                      <Input
+                        value={newCatName}
+                        onChange={(e) => setNewCatName(e.target.value)}
+                        placeholder="Nome da categoria"
+                        autoFocus
+                      />
+                      <Button type="button" size="sm" onClick={addCategory}>Salvar</Button>
+                      <Button type="button" size="sm" variant="ghost" onClick={() => { setAddingCat(false); setNewCatName(""); }}>X</Button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <select
+                        value={categoryId}
+                        onChange={(e) => setCategoryId(e.target.value)}
+                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      >
+                        <option value="">Geral</option>
+                        {categories.map((c) => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                      <Button type="button" size="sm" variant="outline" onClick={() => setAddingCat(true)}>
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="space-y-2">
