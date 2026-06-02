@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { BookOpen, LogOut, Plus, Trash2, Pencil, X } from "lucide-react";
+import { BookOpen, LogOut, Plus, Trash2, Pencil, X, UserCircle2 } from "lucide-react";
 
 type Note = {
   id: string;
@@ -108,8 +108,11 @@ function Dashboard() {
             <BookOpen className="h-5 w-5 text-primary" />
             <span className="font-display text-lg font-semibold">Meu Diário</span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <span className="hidden text-sm text-muted-foreground sm:inline">{user.email}</span>
+            <Button asChild variant="ghost" size="sm">
+              <Link to="/profile"><UserCircle2 className="mr-2 h-4 w-4" /> Perfil</Link>
+            </Button>
             <Button variant="ghost" size="sm" onClick={signOut}>
               <LogOut className="mr-2 h-4 w-4" /> Sair
             </Button>
