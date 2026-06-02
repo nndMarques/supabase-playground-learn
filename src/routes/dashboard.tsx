@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { BookOpen, LogOut, Plus, Trash2, Pencil, X } from "lucide-react";
+import { BookOpen, LogOut, Plus, Trash2, Pencil, X, UserCircle2 } from "lucide-react";
 
 type Note = {
   id: string;
