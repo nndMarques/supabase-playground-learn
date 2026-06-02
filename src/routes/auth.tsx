@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { BookOpen } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { logActivity } from "@/lib/activity";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "Entrar — Diário de Aprendizado" }] }),
