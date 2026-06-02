@@ -65,6 +65,7 @@ function AuthPage() {
         emailRedirectTo: `${window.location.origin}/dashboard`,
         data: {
           full_name: fullName.trim(),
+          username: username.trim(),
           date_of_birth: dob || null,
           interest_area: interest,
           bio: bio.trim(),
